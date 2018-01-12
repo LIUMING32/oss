@@ -1,0 +1,297 @@
+
+accessid = ''
+host = ''
+policyBase64 = ''
+signature = ''
+callbackbody = ''
+filename = ''
+key = ''
+expire = 0
+g_object_name = ''
+g_object_name_type = ''
+now = timestamp = Date.parse(new Date()) / 1000; 
+var keys = ''
+
+function send_request()
+{
+	//原生的ajax
+    var xmlhttp = null;
+    if (window.XMLHttpRequest)
+    {
+        xmlhttp=new XMLHttpRequest();
+    }
+    else if (window.ActiveXObject)
+    {
+        xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+    }
+  
+    if (xmlhttp!=null)
+    {
+		var obj = new Object();
+		obj.catalog = 
+		serverUrl = 'http://192.168.3.92:8443/userservice/oss/postObjectPolicy'
+        xmlhttp.open( "post", serverUrl, true );
+        xmlhttp.send(obj);
+        return xmlhttp.responseText
+    }
+    else
+    {
+       return -1;
+    }
+};
+
+
+function set_upload_param(up, filename, ret,url){
+	//获取input框的输入的文件夹路径
+//	var catalog = $("#dirname").val();
+//	catalog==''?'':catalog;	
+//	var data = {catalog:catalog};
+//	if(ret=true){
+//		url='';
+//	}else{
+//		url = "http://192.168.3.92:8443/userservice/oss/postObjectPolicy";
+//	}
+
+	$.ajax({
+		type:"post",
+		url:url,
+		async:true,
+		data:'',
+		success:function(data){
+			
+			console.dir(data);
+			var msg= data;
+//      	if (filename != '') {
+//		        suffix = get_suffix(filename)
+//		        calculate_object_name(filename)
+//		    }
+        	key = 'img/' + keys;
+        	new_multipart_params = {
+		        'key' : key,
+		        'policy': msg.response.policy,
+		        'OSSAccessKeyId': msg.response.accessid, 
+		        'success_action_status' : '200', //让服务端返回200,不然，默认会返回204
+		        'callback' : msg.response.callback,
+		        'signature': msg.response.signature,
+		    };
+		
+		    up.setOption({
+		        'url': msg.response.host,
+		        'multipart_params': new_multipart_params
+		    });
+		
+		    up.start();
+        	
+		},
+		error:function(){
+			return -1;
+		}
+	});
+	
+}
+
+function check_object_radio() {
+	//单选按钮选择上传本地名，还是随机名
+    var tt = document.getElementsByName('myradio');
+    for (var i = 0; i < tt.length ; i++ )
+    {
+        if(tt[i].checked)
+        {
+            g_object_name_type = tt[i].value;
+            break;
+        }
+    }
+}
+
+function get_signature()
+{
+	//ajax请求的数据，赋值
+    //可以判断当前expire是否超过了当前时间,如果超过了当前时间,就重新取一下.3s 做为缓冲
+    now = timestamp = Date.parse(new Date()) / 1000; 
+    if (expire < now + 3)
+    {
+        body = send_request()
+        var obj = eval ("(" + body + ")");
+        console.dir(obj);
+        host = obj['host']
+        policyBase64 = obj['policy']
+        accessid = obj['accessid']
+        signature = obj['signature']
+        expire = parseInt(obj['expire'])
+        callbackbody = obj['callback'] 
+        key = obj['dir']
+        return true;
+    }
+    return false;
+};
+
+function random_string(len) {
+	//加密秘钥
+　　len = len || 32;
+　　var chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';   
+　　var maxPos = chars.length;
+　　var pwd = '';
+　　for (i = 0; i < len; i++) {
+    　　pwd += chars.charAt(Math.floor(Math.random() * maxPos));
+    }
+    return pwd;
+}
+
+function get_suffix(filename) {
+	//去除.,返回文件名
+    pos = filename.lastIndexOf('.')
+    suffix = ''
+    if (pos != -1) {
+        suffix = filename.substring(pos)
+    }
+    return suffix;
+}
+
+function calculate_object_name(filename)
+{
+	//是否用秘钥加密名字
+    if (g_object_name_type == 'local_name')
+    {
+        g_object_name += "${filename}"
+    }
+    else if (g_object_name_type == 'random_name')
+    {
+        suffix = get_suffix(filename)
+        g_object_name = key + random_string(10) + suffix
+    }
+    return ''
+}
+
+function get_uploaded_object_name(filename)
+{
+	//上传后的名字
+    if (g_object_name_type == 'local_name')
+    {
+        tmp_name = g_object_name
+        tmp_name = tmp_name.replace("${filename}", filename);
+        return tmp_name
+    }
+    else if(g_object_name_type == 'random_name')
+    {
+        return g_object_name
+    }
+}
+
+function set_upload_param0(up, filename, ret)
+{
+	//点击开始上传调用该方法,并把uploader当做参数传进去.
+//  if (ret == false)
+//  {
+//      ret = get_signature()
+//  }
+	var msg = send_request();
+	msg =  eval("(" + msg+ ")");
+	if(msg == -1)
+	{
+		
+	}	
+	console.dir(msg)	
+    if (filename != '') {
+        suffix = get_suffix(filename)
+        calculate_object_name(filename)
+    }
+    new_multipart_params = {
+        'key' : ( null == msg.response.dir ? '' : msg.response.dir),
+        'policy': msg.response.policy,
+        'OSSAccessKeyId': msg.response.accessid, 
+        'success_action_status' : '200', //让服务端返回200,不然，默认会返回204
+//      'callback' : callbackbody,
+        'signature': msg.response.signature,
+    };
+
+    up.setOption({
+        'url': msg.response.host,
+        'multipart_params': new_multipart_params
+    });
+
+    up.start();
+}
+
+var uploader = new plupload.Uploader({
+	runtimes : 'html5,flash,silverlight,html4',
+	browse_button : 'selectfiles', 
+    //multi_selection: false,
+	container: document.getElementById('container'),
+	flash_swf_url : 'lib/plupload-2.1.2/js/Moxie.swf',
+	silverlight_xap_url : 'lib/plupload-2.1.2/js/Moxie.xap',
+    url : 'http://oss.aliyuncs.com',
+
+    filters: {
+        mime_types : [ //只允许上传图片和zip,rar文件
+        { title : "Image files", extensions : "jpg,gif,png,bmp" }, 
+        { title : "Zip files", extensions : "zip,rar" }
+        ],
+        max_file_size : '10mb', //最大只能上传10mb的文件
+        prevent_duplicates : true //不允许选取重复文件
+    },
+
+	init: {
+		PostInit: function() {
+			document.getElementById('ossfile').innerHTML = '';
+			document.getElementById('postfiles').onclick = function() {
+            set_upload_param(uploader, '', false,'http://192.168.3.92:8443/userservice/oss/postObjectPolicy');
+            return false;
+			};
+		},
+
+		FilesAdded: function(up, files) {
+			plupload.each(files, function(file) {
+				document.getElementById('ossfile').innerHTML += '<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ')<b></b>'
+				+'<div class="progress"><div class="progress-bar" style="width: 0%"></div></div>'
+				+'</div>';
+			});
+		},
+
+		BeforeUpload: function(up, file) {
+			keys = file.name;
+			console.dir(file.name)
+			console.dir(file)
+            check_object_radio();
+            set_upload_param(up, file.name, true,'http://192.168.3.92:8443/userservice/oss/postObjectPolicy');
+        },
+
+		UploadProgress: function(up, file) {
+			var d = document.getElementById(file.id);
+			d.getElementsByTagName('b')[0].innerHTML = '<span>' + file.percent + "%</span>";
+            var prog = d.getElementsByTagName('div')[0];
+			var progBar = prog.getElementsByTagName('div')[0]
+			progBar.style.width= 2*file.percent+'px';
+			progBar.setAttribute('aria-valuenow', file.percent);
+		},
+
+		FileUploaded: function(up, file, info){
+            if (info.status == 200)
+            {
+            	window.open('https://hdxy-test.oss-cn-beijing.aliyuncs.com/img/' + keys);
+                document.getElementById(file.id).getElementsByTagName('b')[0].innerHTML = 'upload to oss success, object name:' + get_uploaded_object_name(file.name);
+            }
+            else
+            {
+                document.getElementById(file.id).getElementsByTagName('b')[0].innerHTML = info.response;
+            } 
+		},
+
+		Error: function(up, err) {
+            if (err.code == -600) {
+                document.getElementById('console').appendChild(document.createTextNode("\n选择的文件太大了,可以根据应用情况，在upload.js 设置一下上传的最大大小"));
+            }
+            else if (err.code == -601) {
+                document.getElementById('console').appendChild(document.createTextNode("\n选择的文件后缀不对,可以根据应用情况，在upload.js进行设置可允许的上传文件类型"));
+            }
+            else if (err.code == -602) {
+                document.getElementById('console').appendChild(document.createTextNode("\n这个文件已经上传过一遍了"));
+            }
+            else 
+            {
+                document.getElementById('console').appendChild(document.createTextNode("\nError xml:" + err.response));
+            }
+		}
+	}
+});
+
+uploader.init();

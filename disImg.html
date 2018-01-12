@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+	<title>OSS web直传</title>
+	<link rel="stylesheet" type="text/css" href="style.css"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+</head>
+<body>
+	<form name=theform>
+		<input type="radio" name="myradio" value="local_name" checked=true/> 上传文件名字保持本地文件名字
+		<input type="radio" name="myradio" value="random_name" /> 上传文件名字是随机文件名
+		<br/>
+	</form>
+	<div id="ossfile">你的浏览器不支持flash,Silverlight或者HTML5！</div>
+	<div id="container">
+		<a id="selectfiles" href="javascript:void(0);" class='btn'>选择文件</a>
+		<a id="postfiles" href="javascript:void(0);" class='btn'>开始上传</a>
+	</div>
+
+</body>
+<script src="http://code.jquery.com/jquery-3.2.1.js"   		integrity="sha256-DZAnKJ/6XZ9si04Hgrsxu/8s717jcIzLy3oi35EouyE="  		crossorigin="anonymous"></script>
+<script type="text/javascript" src="lib/base64.js"></script>
+<script type="text/javascript" src="lib/plupload-2.1.2/js/plupload.full.min.js"></script>
+<script type="text/javascript"  src="lib/baseconf.js"></script>
+<!--<script type="text/javascript" src="upload.js"></script>-->
+<script>
+	var serverUrl = serverUrl;
+	var g_object_name_type = '';
+	var g_object_name = '';
+	var filename = '';
+	var key = '';
+	var tmp_name = '';
+	var keys = '';
+	$(function(){
+		function random_string(len) {
+			//随机数
+		　　len = len || 32;
+		　　var chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678';   
+		　　var maxPos = chars.length;
+		　　var pwd = '';
+		　　for (i = 0; i < len; i++) {
+		    　　pwd += chars.charAt(Math.floor(Math.random() * maxPos));
+		    }
+		    return pwd;
+		}
+	
+		function get_suffix(filename) {
+			//去除.,返回后缀
+		    pos = filename.lastIndexOf('.')
+		    suffix = ''
+		    if (pos != -1) {
+		        suffix = filename.substring(pos)
+		    }
+		    return suffix;
+		}
+		
+		function calculate_object_name(filename)
+		{
+			//是否用秘钥加密名字
+		    if (g_object_name_type == 'local_name')
+		    {
+		        g_object_name += "${filename}"
+		    }
+		    else if (g_object_name_type == 'random_name')
+		    {
+		        suffix = get_suffix(filename)
+		        g_object_name = key + random_string(10) + suffix
+		    }
+		    return ''
+		}
+		function check_object_radio() {
+			//单选按钮选择上传本地名，还是随机名
+		    var tt = $(":radio");
+		    for (var i = 0; i < tt.length ; i++ )
+		    {
+		        if(tt[i].checked)
+		        {
+		            g_object_name_type = tt[i].value;
+		            break;
+		        }
+		    }
+		}
+		function get_uploaded_object_name(filename)
+		{
+			//上传后的名字
+		    if (g_object_name_type == 'local_name')
+		    {
+		        tmp_name = g_object_name
+		        tmp_name = tmp_name.replace("${filename}", filename);
+		        return tmp_name
+		    }
+		    else if(g_object_name_type == 'random_name')
+		    {
+		        return g_object_name
+		    }
+		}
+		//ajax请求数据
+		function getData(url,data){
+			var result = -1;
+			$.ajax({
+				type:"post",
+				url:url,
+				async:false,
+				data:data,
+				success:function(res){
+					result =  res;
+				},
+				error:function(){
+					result =  -1;
+				}
+			});
+			return result;
+		}
+		//数据赋值
+		function set_upload_param(up, filename, ret,url){
+			var msg =  getData(serverUrl,'');
+			if (filename != '') {
+		        suffix = get_suffix(filename)
+		        calculate_object_name(filename)
+		    }
+			console.log(random_string(10));
+			key =  + '/' + '${filename}';
+		
+			key = "img/"+ random_string(10) +"${filename}";
+			new_multipart_params = {
+		        'key' : key,
+		        'policy': msg.response.policy,
+		        'OSSAccessKeyId': msg.response.accessid, 
+		        'success_action_status' : '200', //让服务端返回200,不然，默认会返回204
+		        'callback' : msg.response.callback,
+		        'signature': msg.response.signature,
+		    };
+		    up.setOption({
+		        'url': msg.response.host,
+		        'multipart_params': new_multipart_params
+		    });
+		    up.start();
+			
+		}
+		//实例化对象
+		var uploader = new plupload.Uploader({
+			runtimes : 'html5,flash,silverlight,html4',
+			browse_button : 'selectfiles', 
+			container: document.getElementById('container'),
+			flash_swf_url : 'lib/plupload-2.1.2/js/Moxie.swf',
+			silverlight_xap_url : 'lib/plupload-2.1.2/js/Moxie.xap',
+		    url : 'http://oss.aliyuncs.com',
+		    filters: {
+		        mime_types : [ //只允许上传图片和zip,rar文件
+		        { title : "Image files", extensions : "jpg,gif,png,bmp" }, 
+		        { title : "Zip files", extensions : "zip,rar" }
+		        ],
+		        max_file_size : '10mb', //最大只能上传10mb的文件
+		        prevent_duplicates : true //不允许选取重复文件
+		    },
+		
+			init: {
+				//第二步,点击上传后触发,
+				PostInit: function() {
+					$('#ossfile').html('');
+					$('#postfiles').click(function(){
+						set_upload_param(uploader, '', false,serverUrl);
+		            	return false;
+					})
+				},
+				//上传文件名+进度展示标签
+				FilesAdded: function(up, files) {
+					plupload.each(files, function(file) {
+					
+						$('#ossfile').html('<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ')<b></b>'
+						+'<div class="progress"><div class="progress-bar" style="width: 0%"></div></div>'
+						+'</div>');
+					});
+				},
+				//第一步,初始化,选择完上传文件或图片触发
+				BeforeUpload: function(up, file) {
+					check_object_radio();
+		            set_upload_param(up, file.name, true,serverUrl);
+		        },
+				//监控进度条
+				UploadProgress: function(up, file) {
+					var d =  $('#' + file.id);
+					d.children('b').eq(0).html('<span>' + file.percent + '%</span>');
+					var prog = d.children('div').eq(0);
+					var progBar = prog.children('div').eq(0);
+					progBar.css({'width':2*file.percent+'px'});
+					progBar.attr('aria-valuenow', file.percent);
+				},
+				//上传成功后的名字
+				FileUploaded: function(up, file, info){
+		            if (info.status == 200)
+		            {
+		            	
+		            	var d =  $('#' + file.id);
+						d.children('b').eq(0).html('upload to oss success, object name:' + get_uploaded_object_name(file.name));
+		            }
+		            else
+		            {
+		            	var d =  $('#' + file.id);
+						d.children('b').eq(0).html(info.response);
+		            } 
+				},
+				//上传失败
+				Error: function(up, err) {
+		            if (err.code == -600) {
+		            	var $div = "\n选择的文件太大了,可以根据应用情况，在upload.js 设置一下上传的最大大小";
+		            	$('#console').append($div);
+		            }
+		            else if (err.code == -601) {
+		            	var $div = "\n选择的文件后缀不对,可以根据应用情况，在upload.js进行设置可允许的上传文件类型";
+		            	$('#console').append($div);
+		
+		            }
+		            else if (err.code == -602) {
+		            	var $div = "\n这个文件已经上传过一遍了";
+		            	$('#console').append($div);
+		            }
+		            else 
+		            {
+		            	var $div = "\nError xml:" + err.response;
+		            	$('#console').append($div);
+		            }
+				}
+			}
+		});
+		
+		uploader.init();
+	})
+</script>
+</html>
+
+ 
